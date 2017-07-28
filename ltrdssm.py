@@ -4,7 +4,7 @@ import sys
 import tensorflow as tf
 
 
-class MTNet(object):
+class LTRDSSM(object):
     """MTNet model
     """
     def __init__(self, vocab_size, emb_dim=256, repr_dim=256,
