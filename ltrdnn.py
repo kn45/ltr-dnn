@@ -4,8 +4,8 @@ import sys
 import tensorflow as tf
 
 
-class LTRDSSM(object):
-    """LTR-DSSM model
+class LTRDNN(object):
+    """LTR-DNN model
     """
     def __init__(self, vocab_size, emb_dim=256, repr_dim=256,
                  seq_len=50, combiner='sum', lr=1e-3, eps=1.0,
