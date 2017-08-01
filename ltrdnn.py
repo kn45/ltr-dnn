@@ -90,6 +90,10 @@ class LTRDNN(object):
         self.opt = tf.train.AdamOptimizer(lr).minimize(
             self.total_loss, global_step=self.global_step)
 
+        # prediction
+        # pred = 1 if sim_pos >= sim_neg else 0
+        self.preds = tf.sign(tf.sign(self.sim_diff + 1.))
+
         # @TODO: Add some metrics.
         # @TODO: Add regularization. Dropout, l2-reg, etc.
 
@@ -115,6 +119,13 @@ class LTRDNN(object):
             if metric == 'loss':
                 eval_res.append(sess.run(self.loss, feed_dict=eval_dict))
         return eval_res
+
+    def predict_diff(self, sess, inp_qry, inp_pos, inp_neg):
+        pred_dict = {
+            self.inp_qry: inp_qry,
+            self.inp_pos: inp_pos,
+            self.inp_neg: inp_neg}
+        return sess.run(self.preds, feed_dict=pred_dict)
 
     def predict_sim_qt(self, sess, inp_query, inp_title):
         pred_dict = {
