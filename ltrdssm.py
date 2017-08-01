@@ -8,11 +8,16 @@ class LTRDSSM(object):
     """MTNet model
     """
     def __init__(self, vocab_size, emb_dim=256, repr_dim=256,
-                 seq_len=50, combiner='sum', lr=1e-3, init_emb=None):
+                 seq_len=50, combiner='sum', lr=1e-3, eps=1.0,
+                 init_emb=None):
         """Construct MTNet.
         """
         if combiner not in ['sum', 'mean']:
             raise Exception('invalid combiner')
+
+        self.dropout_prob = tf.placeholder(tf.float32, name='dropout_prob')
+        self.global_step = tf.Variable(0, name='global_step', trainable=False)
+        self.eps = eps
 
         # prepare placeholder for query, pos, neg
         # https://www.tensorflow.org/api_docs/python/tf/sparse_placeholder
@@ -20,9 +25,6 @@ class LTRDSSM(object):
         self.inp_qry = tf.sparse_placeholder(tf.int64, 'input_qry')
         self.inp_pos = tf.sparse_placeholder(tf.int64, 'input_pos')
         self.inp_neg = tf.sparse_placeholder(tf.int64, 'input_neg')
-
-        self.dropout_prob = tf.placeholder(tf.float32, name='dropout_prob')
-        self.global_step = tf.Variable(0, name='global_step', trainable=False)
 
         # embedding from pretrained one or random one
         embedding = \
@@ -75,8 +77,8 @@ class LTRDSSM(object):
 
         # calculate hinge loss
         self.sim_diff = tf.substract(self.sim_qp, self.sim_qn)
-        # #rescale from [-2, 2] to [0, 1] as tf.losses.hinge_loss required
-        self.sim_diff = (self.sim_diff + 2.) / 4.
+        # #set zero-loss threshold to eplison
+        self.sim_diff = self.sim_diff / self.eps
         self.labels = tf.ones(shape=tf.shape(self.sim_pos))
         self.loss = tf.losses.hinge_loss(
             labels=self.labels, logits=self.sim_diff)
