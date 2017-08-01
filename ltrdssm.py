@@ -59,7 +59,8 @@ class LTRDSSM(object):
             self.repr_neg = tf.nn.softsign(
                 tf.nn.xw_plus_b(emb_neg, w, b), name='repr_title-')
 
-        # similarity between q&p, q&n
+        # similarity between q&p, q&n, p&n
+        # tf.losses.cosine_distance is not good to use here
         # #shape of norm_qry: batch_size * repr_dim
         self.norm_qry = tf.nn.l2_normalize(self.repr_qry, dim=1)
         self.norm_pos = tf.nn.l2_normalize(self.repr_pos, dim=1)
@@ -74,6 +75,8 @@ class LTRDSSM(object):
 
         # calculate hinge loss
         self.sim_diff = tf.substract(self.sim_qp, self.sim_qn)
+        # #rescale from [-2, 2] to [0, 1] as tf.losses.hinge_loss required
+        self.sim_diff = (self.sim_diff + 2.) / 4.
         self.labels = tf.ones(shape=tf.shape(self.sim_pos))
         self.loss = tf.losses.hinge_loss(
             labels=self.labels, logits=self.sim_diff)
