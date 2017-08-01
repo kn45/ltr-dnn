@@ -5,12 +5,12 @@ import tensorflow as tf
 
 
 class LTRDSSM(object):
-    """MTNet model
+    """LTR-DSSM model
     """
     def __init__(self, vocab_size, emb_dim=256, repr_dim=256,
                  seq_len=50, combiner='sum', lr=1e-3, eps=1.0,
                  init_emb=None):
-        """Construct MTNet.
+        """Construct network.
         """
         if combiner not in ['sum', 'mean']:
             raise Exception('invalid combiner')
