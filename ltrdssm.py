@@ -77,11 +77,13 @@ class LTRDSSM(object):
 
         # calculate hinge loss
         self.sim_diff = tf.substract(self.sim_qp, self.sim_qn)
-        # #set zero-loss threshold to eplison
-        self.sim_diff = self.sim_diff / self.eps
         self.labels = tf.ones(shape=tf.shape(self.sim_pos))
+        # modified hinge_loss = (1 / batch_size) * max(0, eps - sim_diff)
         self.loss = tf.losses.hinge_loss(
-            labels=self.labels, logits=self.sim_diff)
+            labels=self.labels,
+            logits=self.sim_diff / self.eps,
+            reduction=tf.losses.Reduction.MEAN
+            ) * self.eps
         self.total_loss = self.loss  # add reg-loss
 
         # optimizer
