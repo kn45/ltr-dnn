@@ -1,4 +1,4 @@
-# LTR-DSSM
+# LTR-DNN
 
 A tensorflow implementation of LTR DNN semantic similarity model.  
 
