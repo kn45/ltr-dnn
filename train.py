@@ -7,7 +7,7 @@ import tensorflow as tf
 from ltr_dnn import LTRDNN
 import dataproc
 
-def inp_fn(data):
+def inp_fn_2(data):
     q = []
     pt = []
     nt = []
@@ -22,6 +22,35 @@ def inp_fn(data):
         pt.append(dataproc.zero_padding(pos_query, SEQ_LEN))
         nt.append(dataproc.zero_padding(neg_query), SEQ_LEN))
     return np.array(q), np.array(pt), np.array(nt)
+
+def inp_fn(data):
+    q_indices = []
+    pt_indices = []
+    nt_indices = []
+    q_values = []
+    pt_values = []
+    nt_values = []
+    batch_size = len(data)
+    for i, inst in enumerate(data):
+        flds = inst.split('\t')
+        query = map(int, flds[0].split(" "))
+        pos_title = map(int, flds[1].split(" "))
+        neg_title = map(int, flds[2].split(" "))
+        for j in range(0, len(query)):
+            q_indices.append([i,j])
+            q_values.append(query[j])
+
+        for j in range(0, len(pos_title)):
+            pt_indices.append([i,j])
+            pt_values.append(pos_title[j])
+
+        for j in range(0, len(neg_title)):
+            nt_indices.append([i,j])
+            nt_values.append(neg_title[j])
+
+    return (q_indices, q_values, [batch_size, SEQ_LEN]), \
+           (pt_indices, pt_values, [batch_size, SEQ_LEN]), \
+           (nt_indices, nt_values, [batch_size, SEQ_LEN])
 
 train_file = './rt-polarity.shuf.train'
 test_file = './rt-polarity.shuf.test'
