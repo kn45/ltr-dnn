@@ -87,7 +87,9 @@ class LTRDNN(object):
         self.total_loss = self.loss  # add reg-loss
 
         # optimizer
-        self.opt = tf.train.AdamOptimizer(lr).minimize(
+        # kindly notice the efficiecy problem of Adam with sparse op:
+        # https://github.com/tensorflow/tensorflow/issues/6460
+        self.opt = tf.contrib.opt.LazyAdamOptimizer(lr).minimize(
             self.total_loss, global_step=self.global_step)
 
         # prediction
