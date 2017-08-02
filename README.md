@@ -2,7 +2,7 @@
 
 A tensorflow implementation of LTR DNN semantic similarity model.  
 
-Tensorflow v1.2 is used for testing.
+Tensorflow v1.2 on CPU is used for testing.
 
 ----------------------
 
