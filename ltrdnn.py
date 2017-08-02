@@ -22,9 +22,9 @@ class LTRDNN(object):
         # prepare placeholder for query, pos, neg
         # https://www.tensorflow.org/api_docs/python/tf/sparse_placeholder
         # input is a batch_size*seq_len sparse tensor
-        self.inp_qry = tf.sparse_placeholder(tf.int64, 'input_qry')
-        self.inp_pos = tf.sparse_placeholder(tf.int64, 'input_pos')
-        self.inp_neg = tf.sparse_placeholder(tf.int64, 'input_neg')
+        self.inp_qry = tf.sparse_placeholder(dtype=tf.int64, name='input_qry')
+        self.inp_pos = tf.sparse_placeholder(dtype=tf.int64, name='input_pos')
+        self.inp_neg = tf.sparse_placeholder(dtype=tf.int64, name='input_neg')
 
         # embedding from pretrained one or random one
         embedding = \
@@ -36,30 +36,30 @@ class LTRDNN(object):
                 name='emb_mat')
         # #shape of emb_qry: batch_size * emb_dim
         emb_qry = tf.nn.embedding_lookup_sparse(
-            embedding, self.inp_qry, combiner=combiner)
+            embedding, self.inp_qry, sp_weights=None, combiner=combiner)
         emb_pos = tf.nn.embedding_lookup_sparse(
-            embedding, self.inp_pos, combiner=combiner)
+            embedding, self.inp_pos, sp_weights=None, combiner=combiner)
         emb_neg = tf.nn.embedding_lookup_sparse(
-            embedding, self.inp_neg, combiner=combiner)
+            embedding, self.inp_neg, sp_weights=None, combiner=combiner)
 
         # construct fc layer to get repr of sentence
-        with tf.name_scope('query fc'):
+        with tf.name_scope('query-fc'):
             w = tf.get_variable(
-                'W', shape=[emb_dim, repr_dim],
+                'q-fc-W', shape=[emb_dim, repr_dim],
                 initializer=tf.contrib.layers.xavier_initializer())
             b = tf.Variable(tf.constant(0.1, shape=[repr_dim]), name='b')
             # #shape of repr_qry: batch_size * repr_dim
             self.repr_qry = tf.nn.softsign(
                 tf.nn.xw_plus_b(emb_qry, w, b), name='repr_query')
-        with tf.name_scope('title fc'):
+        with tf.name_scope('title-fc'):
             w = tf.get_variable(
-                'W', shape=[emb_dim, repr_dim],
+                't-fc-W', shape=[emb_dim, repr_dim],
                 initializer=tf.contrib.layers.xavier_initializer())
             b = tf.Variable(tf.constant(0.1, shape=[repr_dim]), name='b')
             self.repr_pos = tf.nn.softsign(
-                tf.nn.xw_plus_b(emb_pos, w, b), name='repr_title+')
+                tf.nn.xw_plus_b(emb_pos, w, b), name='repr_title_pos')
             self.repr_neg = tf.nn.softsign(
-                tf.nn.xw_plus_b(emb_neg, w, b), name='repr_title-')
+                tf.nn.xw_plus_b(emb_neg, w, b), name='repr_title_neg')
 
         # similarity between q&p, q&n, p&n
         # tf.losses.cosine_distance is not good to use here
@@ -76,8 +76,8 @@ class LTRDNN(object):
             tf.multiply(self.norm_pos, self.norm_neg), axis=1)
 
         # calculate hinge loss
-        self.sim_diff = tf.substract(self.sim_qp, self.sim_qn)
-        self.labels = tf.ones(shape=tf.shape(self.sim_pos))
+        self.sim_diff = tf.subtract(self.sim_qp, self.sim_qn)
+        self.labels = tf.ones(shape=tf.shape(self.sim_diff))
         # modified hinge_loss = (1 / batch_size) * max(0, eps - sim_diff)
         self.loss = tf.losses.hinge_loss(
             labels=self.labels,
@@ -102,9 +102,9 @@ class LTRDNN(object):
 
     def train_step(self, sess, inp_batch_q, inp_batch_p, inp_batch_n):
         input_dict = {
-            self.inp_q: inp_batch_q,
-            self.inp_p: inp_batch_p,
-            self.inp_n: inp_batch_n}
+            self.inp_qry: inp_batch_q,
+            self.inp_pos: inp_batch_p,
+            self.inp_neg: inp_batch_n}
         sess.run(self.opt, feed_dict=input_dict)
 
     def eval_step(self, sess, dev_qry, dev_pos, dev_neg, metrics=None):
