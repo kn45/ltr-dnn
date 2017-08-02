@@ -37,7 +37,7 @@ def inp_fn(data):
 flags = tf.flags
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('seq_len', 30, 'max seqence length')
-flags.DEFINE_integer('train_bs', 16, 'train batch size')
+flags.DEFINE_integer('train_bs', 128, 'train batch size')
 flags.DEFINE_integer('max_epoch', 1, 'max epoch')
 flags.DEFINE_integer('max_iter', 100, 'max iteration')
 
