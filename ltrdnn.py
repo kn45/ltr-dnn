@@ -100,7 +100,7 @@ class LTRDNN(object):
         # @TODO: Add regularization. Dropout, l2-reg, etc.
 
         # saver and loader
-        self.saver = tf.train.Saver()
+        self.saver = tf.train.Saver(tf.trainable_variables())
 
     def train_step(self, sess, inp_batch_q, inp_batch_p, inp_batch_n):
         input_dict = {
