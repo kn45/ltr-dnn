@@ -2,26 +2,11 @@
 
 import numpy as np
 import sys
-#sys.path.append('../../MLFlow/utils')
+sys.path.append('../MLFlow/utils')
 import tensorflow as tf
-from ltr_dnn import LTRDNN
+from ltrdnn import LTRDNN
 import dataproc
 
-def inp_fn_2(data):
-    q = []
-    pt = []
-    nt = []
-    for inst in data:
-        flds = inst.split('\t')
-        if len(flds) < 3:
-            continue
-        query = map(int, flds[0].split(" "))
-        pos_title = map(int, flds[1].split(" "))
-        neg_title = map(int, flds[2].split(" "))
-        q.append(dataproc.zero_padding(query, SEQ_LEN))
-        pt.append(dataproc.zero_padding(pos_query, SEQ_LEN))
-        nt.append(dataproc.zero_padding(neg_query), SEQ_LEN))
-    return np.array(q), np.array(pt), np.array(nt)
 
 def inp_fn(data):
     q_indices = []
@@ -33,51 +18,53 @@ def inp_fn(data):
     batch_size = len(data)
     for i, inst in enumerate(data):
         flds = inst.split('\t')
-        query = map(int, flds[0].split(" "))
-        pos_title = map(int, flds[1].split(" "))
-        neg_title = map(int, flds[2].split(" "))
-        for j in range(0, len(query)):
-            q_indices.append([i,j])
-            q_values.append(query[j])
+        query = map(int, flds[0].split(' '))
+        pos_title = map(int, flds[1].split(' '))
+        neg_title = map(int, flds[2].split(' '))
+        for j, word_id in enumerate(query):
+            q_indices.append([i, j])
+            q_values.append(word_id)
+        for j, word_id in enumerate(pos_title):
+            pt_indices.append([i, j])
+            pt_values.append(word_id)
+        for j, word_id in enumerate(neg_title):
+            nt_indices.append([i, j])
+            nt_values.append(word_id)
+    return (q_indices, q_values, [batch_size, FLAGS.seq_len]), \
+           (pt_indices, pt_values, [batch_size, FLAGS.seq_len]), \
+           (nt_indices, nt_values, [batch_size, FLAGS.seq_len])
 
-        for j in range(0, len(pos_title)):
-            pt_indices.append([i,j])
-            pt_values.append(pos_title[j])
+flags = tf.flags
+FLAGS = flags.FLAGS
+flags.DEFINE_integer('seq_len', 30, 'max seqence length')
+flags.DEFINE_integer('train_bs', 16, 'train batch size')
+flags.DEFINE_integer('max_epoch', 1, 'max epoch')
+flags.DEFINE_integer('max_iter', 100, 'max iteration')
 
-        for j in range(0, len(neg_title)):
-            nt_indices.append([i,j])
-            nt_values.append(neg_title[j])
 
-    return (q_indices, q_values, [batch_size, SEQ_LEN]), \
-           (pt_indices, pt_values, [batch_size, SEQ_LEN]), \
-           (nt_indices, nt_values, [batch_size, SEQ_LEN])
-
-train_file = './rt-polarity.shuf.train'
-test_file = './rt-polarity.shuf.test'
-freader = dataproc.BatchReader(train_file)
+train_file = './data_train_example.tsv'
+test_file = './data_train_example.tsv'
+train_freader = dataproc.BatchReader(train_file, max_epoch=FLAGS.max_iter)
 with open(test_file) as f:
-    test_data = [x.rstrip('\n').split("\t") for x in f.readlines()]
+    test_data = [x.rstrip('\n') for x in f.readlines()][0: 10]
 test_q, test_pt, test_nt = inp_fn(test_data)
 
-mdl = TextRNNClassifier(
-    vocab_size = 1532783
+mdl = LTRDNN(
+    vocab_size=1532783,
     emb_dim=256,
     repr_dim=256,
-    seq_len=300,
+    seq_len=FLAGS.seq_len,
     combiner='sum',
     lr=1e-3,
-    init_emb=None
-    )
+    eps=0.5)
 
 sess = tf.Session()
 sess.run(tf.global_variables_initializer())
 sess.run(tf.local_variables_initializer())
-metrics = ['loss', 'auc']
-niter = 0
+metrics = ['loss']
 mdl_ckpt_dir = './model_ckpt/model.ckpt'
-while niter < 500:
-    niter += 1
-    batch_data = freader.get_batch(128)
+for niter in xrange(FLAGS.max_iter):
+    batch_data = train_freader.get_batch(FLAGS.train_bs)
     if not batch_data:
         break
     train_q, train_pt, train_nt = inp_fn(batch_data)
@@ -87,5 +74,5 @@ while niter < 500:
         if niter % 20 == 0 else 'SKIP'
     print niter, 'train:', train_eval, 'test:', test_eval
 save_path = mdl.saver.save(sess, mdl_ckpt_dir, global_step=mdl.global_step)
-print "model saved:", save_path
+print 'model saved:', save_path
 sess.close()
