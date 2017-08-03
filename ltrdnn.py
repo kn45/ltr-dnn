@@ -25,6 +25,8 @@ class LTRDNN(object):
         self.inp_qry = tf.sparse_placeholder(dtype=tf.int64, name='input_qry')
         self.inp_pos = tf.sparse_placeholder(dtype=tf.int64, name='input_pos')
         self.inp_neg = tf.sparse_placeholder(dtype=tf.int64, name='input_neg')
+        # use only when predicting sim-qq
+        self.inp_prd = tf.sparse_placeholder(dtype=tf.int64, name='input_prd')
 
         # embedding from pretrained one or random one
         embedding = \
@@ -41,6 +43,8 @@ class LTRDNN(object):
             embedding, self.inp_pos, sp_weights=None, combiner=combiner)
         emb_neg = tf.nn.embedding_lookup_sparse(
             embedding, self.inp_neg, sp_weights=None, combiner=combiner)
+        emb_prd = tf.nn.embedding_lookup_sparse(
+            embedding, self.inp_prd, sp_weights=None, combiner=combiner)
 
         # construct fc layer to get repr of sentence
         with tf.name_scope('query-fc'):
@@ -51,6 +55,8 @@ class LTRDNN(object):
             # #shape of repr_qry: batch_size * repr_dim
             self.repr_qry = tf.nn.softsign(
                 tf.nn.xw_plus_b(emb_qry, w, b), name='repr_query')
+            self.repr_prd = tf.nn.softsign(
+                tf.nn.xw_plus_b(emb_prd, w, b), name='repr_predq')
         with tf.name_scope('title-fc'):
             w = tf.get_variable(
                 't-fc-W', shape=[emb_dim, repr_dim],
@@ -67,13 +73,14 @@ class LTRDNN(object):
         self.norm_qry = tf.nn.l2_normalize(self.repr_qry, dim=1)
         self.norm_pos = tf.nn.l2_normalize(self.repr_pos, dim=1)
         self.norm_neg = tf.nn.l2_normalize(self.repr_neg, dim=1)
+        self.norm_prd = tf.nn.l2_normalize(self.repr_prd, dim=1)
         # #shape of simi_pos: batch_size * 1
         self.sim_qp = tf.reduce_sum(
             tf.multiply(self.norm_qry, self.norm_pos), axis=1)
         self.sim_qn = tf.reduce_sum(
             tf.multiply(self.norm_qry, self.norm_neg), axis=1)
-        self.sim_pn = tf.reduce_sum(
-            tf.multiply(self.norm_pos, self.norm_neg), axis=1)
+        self.sim_qq = tf.reduce_sum(
+            tf.multiply(self.norm_qry, self.norm_prd), axis=1)
 
         # calculate hinge loss
         self.sim_diff = tf.subtract(self.sim_qp, self.sim_qn)
@@ -123,6 +130,9 @@ class LTRDNN(object):
         return eval_res
 
     def predict_diff(self, sess, inp_qry, inp_pos, inp_neg):
+        """predict which title is more similar to query.
+        @return: 1.0/0.0 if first/second title is more similar.
+        """
         pred_dict = {
             self.inp_qry: inp_qry,
             self.inp_pos: inp_pos,
@@ -130,13 +140,19 @@ class LTRDNN(object):
         return sess.run(self.preds, feed_dict=pred_dict)
 
     def predict_sim_qt(self, sess, inp_query, inp_title):
+        """predict similarity of query and title.
+        @return: cosine similarity. value range [-1, 1].
+        """
         pred_dict = {
             self.inp_qry: inp_query,
             self.inp_pos: inp_title}
         return sess.run(self.sim_qp, feed_dict=pred_dict)
 
-    def predict_sim_qq(self, sess, inp_title1, inp_title2):
+    def predict_sim_qq(self, sess, inp_query1, inp_query2):
+        """predict similarity of two queries.
+        @return: cosine similarity. value range [-1, 1].
+        """
         pred_dict = {
-            self.inp_pos: inp_title1,
-            self.inp_neg: inp_title2}
-        return sess.run(self.sim_pn, feed_dict=pred_dict)
+            self.inp_qry: inp_query1,
+            self.inp_prd: inp_query2}
+        return sess.run(self.sim_qq, feed_dict=pred_dict)

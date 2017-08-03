@@ -19,7 +19,8 @@ flags.DEFINE_string('combiner', 'sum', 'how to combine words in a sentence')
 flags.DEFINE_integer('train_bs', 128, 'train batch size')
 flags.DEFINE_integer('max_epoch', 1, 'max epoch')
 flags.DEFINE_integer('max_iter', 100, 'max iteration')
-flags.DEFINE_float('eps', 0.5, 'zero-loss threshold epsilon in hinge loss')
+flags.DEFINE_float('eps', 1.0, 'zero-loss threshold epsilon in hinge loss')
+flags.DEFINE_integer('eval_steps', 20, 'every how many steps to evaluate')
 
 
 def inp_fn(data):
@@ -63,7 +64,7 @@ mdl = LTRDNN(
     emb_dim=FLAGS.emb_dim,
     repr_dim=FLAGS.repr_dim,
     combiner=FLAGS.combiner,
-    eps=0.5)
+    eps=FLAGS.eps)
 
 sess = tf.Session()
 sess.run(tf.global_variables_initializer())
@@ -78,8 +79,12 @@ for niter in xrange(FLAGS.max_iter):
     mdl.train_step(sess, train_q, train_pt, train_nt)
     train_eval = mdl.eval_step(sess, train_q, train_pt, train_nt, metrics)
     test_eval = mdl.eval_step(sess, test_q, test_pt, test_nt, metrics) \
-        if niter % 20 == 0 else 'SKIP'
-    print niter, 'train:', train_eval, 'test:', test_eval
+        if niter % FLAGS.eval_steps == 0 else 'SKIP'
+    pred_diff = mdl.predict_diff(sess, train_q, train_pt, train_nt)
+    pred_qt = mdl.predict_sim_qt(sess, train_q, train_pt)
+    pred_qq = mdl.predict_sim_qq(sess, train_q, train_q)
+    print niter, 'train_loss:', train_eval, 'test_loss:', test_eval, \
+        'diff 0/1:', pred_diff, 'sim_qt:', pred_qt, 'sim_qq:', pred_qq
 save_path = mdl.saver.save(sess, mdl_ckpt_dir, global_step=mdl.global_step)
 print 'model saved:', save_path
 sess.close()
