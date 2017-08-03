@@ -2,10 +2,24 @@
 
 import numpy as np
 import sys
-sys.path.append('../MLFlow/utils')
 import tensorflow as tf
 from ltrdnn import LTRDNN
+sys.path.append('../MLFlow/utils')
 import dataproc
+
+
+flags = tf.flags
+FLAGS = flags.FLAGS
+# model related:
+flags.DEFINE_integer('vocab_size', 1532783, 'vocabulary size')
+flags.DEFINE_integer('emb_dim', 256, 'embedding dimension')
+flags.DEFINE_integer('repr_dim', 256, 'sentence representing dimension')
+flags.DEFINE_string('combiner', 'sum', 'how to combine words in a sentence')
+# training related:
+flags.DEFINE_integer('train_bs', 128, 'train batch size')
+flags.DEFINE_integer('max_epoch', 1, 'max epoch')
+flags.DEFINE_integer('max_iter', 100, 'max iteration')
+flags.DEFINE_float('eps', 0.5, 'zero-loss threshold epsilon in hinge loss')
 
 
 def inp_fn(data):
@@ -16,11 +30,13 @@ def inp_fn(data):
     pt_values = []
     nt_values = []
     batch_size = len(data)
+    seq_len = 0
     for i, inst in enumerate(data):
         flds = inst.split('\t')
         query = map(int, flds[0].split(' '))
         pos_title = map(int, flds[1].split(' '))
         neg_title = map(int, flds[2].split(' '))
+        seq_len = max(seq_len, len(query), len(pos_title), len(neg_title))
         for j, word_id in enumerate(query):
             q_indices.append([i, j])
             q_values.append(word_id)
@@ -30,16 +46,9 @@ def inp_fn(data):
         for j, word_id in enumerate(neg_title):
             nt_indices.append([i, j])
             nt_values.append(word_id)
-    return (q_indices, q_values, [batch_size, FLAGS.seq_len]), \
-           (pt_indices, pt_values, [batch_size, FLAGS.seq_len]), \
-           (nt_indices, nt_values, [batch_size, FLAGS.seq_len])
-
-flags = tf.flags
-FLAGS = flags.FLAGS
-flags.DEFINE_integer('seq_len', 30, 'max seqence length')
-flags.DEFINE_integer('train_bs', 128, 'train batch size')
-flags.DEFINE_integer('max_epoch', 1, 'max epoch')
-flags.DEFINE_integer('max_iter', 100, 'max iteration')
+    return (q_indices, q_values, [batch_size, seq_len]), \
+           (pt_indices, pt_values, [batch_size, seq_len]), \
+           (nt_indices, nt_values, [batch_size, seq_len])
 
 
 train_file = './data_train_example.tsv'
@@ -50,12 +59,10 @@ with open(test_file) as f:
 test_q, test_pt, test_nt = inp_fn(test_data)
 
 mdl = LTRDNN(
-    vocab_size=1532783,
-    emb_dim=256,
-    repr_dim=256,
-    seq_len=FLAGS.seq_len,
-    combiner='sum',
-    lr=1e-3,
+    vocab_size=FLAGS.vocab_size,
+    emb_dim=FLAGS.emb_dim,
+    repr_dim=FLAGS.repr_dim,
+    combiner=FLAGS.combiner,
     eps=0.5)
 
 sess = tf.Session()
