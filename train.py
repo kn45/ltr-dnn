@@ -51,6 +51,33 @@ def inp_fn(data):
            (pt_indices, pt_values, [batch_size, seq_len]), \
            (nt_indices, nt_values, [batch_size, seq_len])
 
+def eval_fn(inst):
+    q_indices = []
+    pt_indices = []
+    nt_indices = []
+    q_values = []
+    pt_values = []
+    nt_values = []
+    batch_size = 1
+    flds = inst.split('\t')
+    query = map(int, flds[0].split(' '))
+    pos_title = map(int, flds[1].split(' '))
+    neg_title = map(int, flds[2].split(' '))
+    seq_len = max(len(query), len(pos_title), len(neg_title))
+    i = 0
+    for j, word_id in enumerate(query):
+        q_indices.append([i, j])
+        q_values.append(word_id)
+    for j, word_id in enumerate(pos_title):
+        pt_indices.append([i, j])
+        pt_values.append(word_id)
+    for j, word_id in enumerate(neg_title):
+        nt_indices.append([i, j])
+        nt_values.append(word_id)
+    return [(q_indices, q_values, [batch_size, seq_len])], \
+           [(pt_indices, pt_values, [batch_size, seq_len])], \
+           [(nt_indices, nt_values, [batch_size, seq_len])]
+
 
 train_file = './data_train_example.tsv'
 test_file = './data_train_example.tsv'
@@ -85,6 +112,13 @@ for niter in xrange(FLAGS.max_iter):
     pred_qq = mdl.predict_sim_qq(sess, train_q, train_q)
     print niter, 'train_loss:', train_eval, 'test_loss:', test_eval, \
         'diff 0/1:', pred_diff, 'sim_qt:', pred_qt, 'sim_qq:', pred_qq
+
+feval = open(test_file)
+acc = mdl.pairwise_accuracy(sess, feval, eval_fn)
+print 'pairwise accuracy:', acc
+
 save_path = mdl.saver.save(sess, mdl_ckpt_dir, global_step=mdl.global_step)
 print 'model saved:', save_path
+
 sess.close()
+feval.close()

@@ -1,4 +1,4 @@
-import random
+import itertools
 import numpy as np
 import sys
 import tensorflow as tf
@@ -105,9 +105,25 @@ class LTRDNN(object):
         # @TODO: Add some metrics.
         # @TODO: Add regularization like dropout, l2-reg, etc.
 
+        # accumulated accuracy
+        # re-initialize local variables to conduct a new evaluation
+        self.acc, self.update_acc = tf.contrib.metrics.streaming_accuracy(
+            labels=self.labels, predictions=self.preds)
+
         # saver and loader
         # drop local variables of optimizer
         self.saver = tf.train.Saver(tf.trainable_variables())
+
+    def accumulate_accuracy(self, sess, inp_q, inp_p, inp_n):
+        """update accuracy by inputs and staged value.
+        @return: newly-updated accuracy.
+        """
+        input_dict = {
+            self.inp_qry: inp_q,
+            self.inp_pos: inp_p,
+            self.inp_neg: inp_n}
+        sess.run(self.update_acc, feed_dict=input_dict)
+        return sess.run(self.acc)
 
     def train_step(self, sess, inp_batch_q, inp_batch_p, inp_batch_n):
         input_dict = {
@@ -156,3 +172,16 @@ class LTRDNN(object):
             self.inp_qry: inp_query1,
             self.inp_prd: inp_query2}
         return sess.run(self.sim_qq, feed_dict=pred_dict)
+
+    def pairwise_accuracy(self, sess, fiter, inp_fn):
+        """evaluate the correct pairwise order ratio.
+        @return: correct_pair/ total_pair
+        @fiter:  an iterable to fetch instance (qry&pos&neg of each query)
+        @inp_fn: a func extracting ([qry], [pos], [neg]) from instance
+        """
+        accuracy = None
+        for inst in fiter:
+            qrys, poss, negs = inp_fn(inst)
+            for qry, pos, neg in itertools.product(qrys, poss, negs):
+                accuracy = self.accumulate_accuracy(sess, qry, pos, neg)
+        return accuracy
