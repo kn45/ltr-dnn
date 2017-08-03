@@ -67,14 +67,13 @@ class LTRDNN(object):
             self.repr_neg = tf.nn.softsign(
                 tf.nn.xw_plus_b(emb_neg, w, b), name='repr_title_neg')
 
-        # similarity between q&p, q&n, p&n
-        # tf.losses.cosine_distance is not good to use here
+        # cosine similarity between q&p, q&n, q&q
         # #shape of norm_qry: batch_size * repr_dim
         self.norm_qry = tf.nn.l2_normalize(self.repr_qry, dim=1)
         self.norm_pos = tf.nn.l2_normalize(self.repr_pos, dim=1)
         self.norm_neg = tf.nn.l2_normalize(self.repr_neg, dim=1)
         self.norm_prd = tf.nn.l2_normalize(self.repr_prd, dim=1)
-        # #shape of simi_pos: batch_size * 1
+        # #shape of sim_qp: batch_size * 1
         self.sim_qp = tf.reduce_sum(
             tf.multiply(self.norm_qry, self.norm_pos), axis=1)
         self.sim_qn = tf.reduce_sum(
@@ -104,9 +103,10 @@ class LTRDNN(object):
         self.preds = tf.sign(tf.sign(self.sim_diff + 1.))
 
         # @TODO: Add some metrics.
-        # @TODO: Add regularization. Dropout, l2-reg, etc.
+        # @TODO: Add regularization like dropout, l2-reg, etc.
 
         # saver and loader
+        # drop local variables of optimizer
         self.saver = tf.train.Saver(tf.trainable_variables())
 
     def train_step(self, sess, inp_batch_q, inp_batch_p, inp_batch_n):
