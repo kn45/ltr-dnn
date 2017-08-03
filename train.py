@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 
+import dataproc
 import numpy as np
 import sys
 import tensorflow as tf
 from ltrdnn import LTRDNN
-sys.path.append('../MLFlow/utils')
-import dataproc
+
 
 
 flags = tf.flags
