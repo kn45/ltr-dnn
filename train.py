@@ -3,6 +3,7 @@
 import dataproc
 import numpy as np
 import sys
+import random
 import tensorflow as tf
 from ltrdnn import LTRDNN
 
@@ -23,6 +24,10 @@ flags.DEFINE_float('eps', 1.0, 'zero-loss threshold epsilon in hinge loss')
 flags.DEFINE_integer('eval_steps', 20, 'every how many steps to evaluate')
 
 
+def ramdon_choose(l):
+    rand_obj = random.sample(l, 1)[0]
+    return rand_obj
+
 def inp_fn(data):
     q_indices = []
     pt_indices = []
@@ -35,8 +40,16 @@ def inp_fn(data):
     for i, inst in enumerate(data):
         flds = inst.split('\t')
         query = map(int, flds[0].split(' '))
-        pos_title = map(int, flds[1].split(' '))
-        neg_title = map(int, flds[2].split(' '))
+        pos_title_num = int(flds[1])
+        pos_titles = flds[2:2+pos_title_num]
+        neg_title_num = int(flds[2+pos_title_num])
+        neg_titles = flds[2+pos_title_num+1:]
+
+        pos_title = ramdon_choose(pos_titles)
+        pos_title = map(int, pos_title.split(' '))
+        neg_title = ramdon_choose(neg_titles)
+        neg_title = map(int, neg_title.split(' '))
+
         seq_len = max(seq_len, len(query), len(pos_title), len(neg_title))
         for j, word_id in enumerate(query):
             q_indices.append([i, j])
@@ -79,11 +92,14 @@ def eval_fn(inst):
            [(nt_indices, nt_values, [batch_size, seq_len])]
 
 
+#train_file = './data/3.train.negtive_sampled.ids'
+#test_file = './data/3.train.negtive_sampled.ids'
 train_file = './data_train_example.tsv'
 test_file = './data_train_example.tsv'
+#test_file = './data/3.test.negtive_sampled.ids'
 train_freader = dataproc.BatchReader(train_file, max_epoch=FLAGS.max_iter)
 with open(test_file) as f:
-    test_data = [x.rstrip('\n') for x in f.readlines()][0: 10]
+    test_data = [x.rstrip('\n') for x in f.readlines()]
 test_q, test_pt, test_nt = inp_fn(test_data)
 
 mdl = LTRDNN(
@@ -108,10 +124,12 @@ for niter in xrange(FLAGS.max_iter):
     test_eval = mdl.eval_step(sess, test_q, test_pt, test_nt, metrics) \
         if niter % FLAGS.eval_steps == 0 else 'SKIP'
     pred_diff = mdl.predict_diff(sess, train_q, train_pt, train_nt)
-    pred_qt = mdl.predict_sim_qt(sess, train_q, train_pt)
-    pred_qq = mdl.predict_sim_qq(sess, train_q, train_q)
-    print niter, 'train_loss:', train_eval, 'test_loss:', test_eval, \
-        'diff 0/1:', pred_diff, 'sim_qt:', pred_qt, 'sim_qq:', pred_qq
+    #pred_qp = mdl.predict_sim_qt(sess, train_q, train_pt)
+    #pred_qn = mdl.predict_sim_qt(sess, train_q, train_nt)
+    #pred_qq = mdl.predict_sim_qq(sess, train_q, train_q)
+    #print niter, 'train_loss:', train_eval, 'test_loss:', test_eval, \
+    #    'diff 0/1:', pred_diff, 'sim_qp:', pred_qp, 'sim_qn', pred_qn, \
+    #    'sim_qq:', pred_qq
 
 feval = open(test_file)
 acc = mdl.pairwise_accuracy(sess, feval, eval_fn)
