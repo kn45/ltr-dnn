@@ -92,10 +92,10 @@ def eval_fn(inst):
            [(nt_indices, nt_values, [batch_size, seq_len])]
 
 
-#train_file = './data/3.train.negtive_sampled.ids'
-#test_file = './data/3.train.negtive_sampled.ids'
-train_file = './data_train_example.tsv'
-test_file = './data_train_example.tsv'
+train_file = './3.train.negtive_sampled.ids'
+test_file = './3.train.negtive_sampled.ids.pair'
+#train_file = './data_train_example.tsv'
+#test_file = './data_train_example.tsv'
 #test_file = './data/3.test.negtive_sampled.ids'
 train_freader = dataproc.BatchReader(train_file, max_epoch=FLAGS.max_iter)
 with open(test_file) as f:
@@ -123,13 +123,14 @@ for niter in xrange(FLAGS.max_iter):
     train_eval = mdl.eval_step(sess, train_q, train_pt, train_nt, metrics)
     test_eval = mdl.eval_step(sess, test_q, test_pt, test_nt, metrics) \
         if niter % FLAGS.eval_steps == 0 else 'SKIP'
-    pred_diff = mdl.predict_diff(sess, train_q, train_pt, train_nt)
+    #pred_diff = mdl.predict_diff(sess, train_q, train_pt, train_nt)
     #pred_qp = mdl.predict_sim_qt(sess, train_q, train_pt)
     #pred_qn = mdl.predict_sim_qt(sess, train_q, train_nt)
     #pred_qq = mdl.predict_sim_qq(sess, train_q, train_q)
     #print niter, 'train_loss:', train_eval, 'test_loss:', test_eval, \
     #    'diff 0/1:', pred_diff, 'sim_qp:', pred_qp, 'sim_qn', pred_qn, \
     #    'sim_qq:', pred_qq
+    print niter, 'train_loss:', train_eval, 'test_loss:', test_eval
 
 feval = open(test_file)
 acc = mdl.pairwise_accuracy(sess, feval, eval_fn)
