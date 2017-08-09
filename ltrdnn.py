@@ -100,7 +100,7 @@ class LTRDNN(object):
 
         # prediction
         # pred = 1 if sim_pos >= sim_neg else 0
-        self.preds = tf.sign(tf.sign(self.sim_diff + 1.))
+        self.preds = tf.sign(tf.sign(self.sim_diff) + 1.)
 
         # @TODO: Add some metrics.
         # @TODO: Add regularization like dropout, l2-reg, etc.
