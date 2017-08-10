@@ -180,7 +180,7 @@ class LTRDNN(object):
         @inp_fn: a func extracting ([qry], [pos], [neg]) from instance
         """
         accuracy = None
-        for inst in fiter:
+        for n, inst in enumerate(fiter):
             qrys, poss, negs = inp_fn(inst)
             for qry, pos, neg in itertools.product(qrys, poss, negs):
                 accuracy = self.accumulate_accuracy(sess, qry, pos, neg)
