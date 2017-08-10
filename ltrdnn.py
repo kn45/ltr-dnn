@@ -95,9 +95,7 @@ class LTRDNN(object):
         # optimizer
         # kindly notice the efficiecy problem of Adam with sparse op:
         # https://github.com/tensorflow/tensorflow/issues/6460
-        # self.opt = tf.contrib.opt.LazyAdamOptimizer(lr).minimize(
-        #     self.total_loss, global_step=self.global_step)
-        self.opt = tf.train.AdadeltaOptimizer(lr).minimize(
+        self.opt = tf.contrib.opt.LazyAdamOptimizer(lr).minimize(
             self.total_loss, global_step=self.global_step)
 
         # prediction
