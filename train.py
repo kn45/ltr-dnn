@@ -110,11 +110,12 @@ def eval_fn(inst):
 # test_file = './3.train.negtive_sampled.ids.pair'
 # test_file = './data/3.test.negtive_sampled.ids'
 train_file = './data_train_example.tsv'
+valid_file = './data_test_example.tsv'
 test_file = './data_test_example.tsv'
 train_freader = dataproc.BatchReader(train_file, max_epoch=FLAGS.max_epoch)
-with open(test_file) as f:
-    test_data = [x.rstrip('\n') for x in f.readlines()]
-test_q, test_pt, test_nt = inp_fn(test_data)
+with open(valid_file) as f:
+    valid_data = [x.rstrip('\n') for x in f.readlines()]
+valid_q, valid_pt, valid_nt = inp_fn(valid_data)
 
 mdl = LTRDNN(
     vocab_size=FLAGS.vocab_size,
@@ -135,9 +136,9 @@ for niter in xrange(FLAGS.max_iter):
     train_q, train_pt, train_nt = inp_fn(batch_data)
     mdl.train_step(sess, train_q, train_pt, train_nt)
     train_eval = mdl.eval_step(sess, train_q, train_pt, train_nt, metrics)
-    test_eval = mdl.eval_step(sess, test_q, test_pt, test_nt, metrics) \
+    valid_eval = mdl.eval_step(sess, valid_q, valid_pt, valid_nt, metrics) \
         if niter % FLAGS.eval_steps == 0 else 'SKIP'
-    print niter, 'train_loss:', train_eval, 'test_loss:', test_eval
+    print niter, 'train_loss:', train_eval, 'valid_loss:', valid_eval
 
 feval = open(test_file)
 acc = mdl.pairwise_accuracy(sess, feval, eval_fn)
