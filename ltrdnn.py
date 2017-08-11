@@ -1,4 +1,3 @@
-import itertools
 import numpy as np
 import sys
 import tensorflow as tf
@@ -102,7 +101,6 @@ class LTRDNN(object):
         # pred = 1 if sim_pos >= sim_neg else 0
         self.preds = tf.sign(tf.sign(self.sim_diff) + 1.)
 
-        # @TODO: Add some metrics.
         # @TODO: Add regularization like dropout, l2-reg, etc.
 
         # accumulated accuracy
@@ -113,17 +111,6 @@ class LTRDNN(object):
         # saver and loader
         # drop local variables of optimizer
         self.saver = tf.train.Saver(tf.trainable_variables())
-
-    def accumulate_accuracy(self, sess, inp_q, inp_p, inp_n):
-        """update accuracy by inputs and staged value.
-        @return: newly-updated accuracy.
-        """
-        input_dict = {
-            self.inp_qry: inp_q,
-            self.inp_pos: inp_p,
-            self.inp_neg: inp_n}
-        sess.run(self.update_acc, feed_dict=input_dict)
-        return sess.run(self.acc)
 
     def train_step(self, sess, inp_batch_q, inp_batch_p, inp_batch_n):
         input_dict = {
@@ -173,15 +160,30 @@ class LTRDNN(object):
             self.inp_prd: inp_query2}
         return sess.run(self.sim_qq, feed_dict=pred_dict)
 
-    def pairwise_accuracy(self, sess, fiter, inp_fn):
+    def accumulate_accuracy(self, sess, inp_q, inp_p, inp_n):
+        """update accuracy by inputs and staged value.
+        @return: newly-updated accuracy.
+        """
+        input_dict = {
+            self.inp_qry: inp_q,
+            self.inp_pos: inp_p,
+            self.inp_neg: inp_n}
+        sess.run(self.update_acc, feed_dict=input_dict)
+        return sess.run(self.acc)
+
+    def pairwise_accuracy(self, sess, fiter, inp_fn, verb=None):
         """evaluate the correct pairwise order ratio.
-        @return: correct_pair/ total_pair
-        @fiter:  an iterable to fetch instance (qry&pos&neg of each query)
-        @inp_fn: a func extracting ([qry], [pos], [neg]) from instance
+        @return: accuracy=(correct_pair/total_pair).
+        @fiter : an iterable yielding instance (qry & pos & neg of each query).
+        @inp_fn: a func extracting (qry, pos, neg) from instance, in which
+                 qry, pos, neg are all batch-sentence that could be feed to
+                 self.inp_X.
+        @verb  : print progress hint every verb lines. None for no hint.
         """
         accuracy = None
-        for n, inst in enumerate(fiter):
+        for nl, inst in enumerate(fiter):
+            if verb and nl % verb == 0:  # print hint
+                sys.stderr.write(str(verb) + ' lines in pairwise_acc.\n')
             qrys, poss, negs = inp_fn(inst)
-            for qry, pos, neg in itertools.product(qrys, poss, negs):
-                accuracy = self.accumulate_accuracy(sess, qry, pos, neg)
+            accuracy = self.accumulate_accuracy(sess, qrys, poss, negs)
         return accuracy

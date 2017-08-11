@@ -21,8 +21,10 @@ class LTRDNN(object):
         input_dict = {
             self.labels: l,
             self.preds: p}
-        sess.run(self.update_acc, feed_dict=input_dict)
-        return sess.run(self.acc)
+        ct = sess.run(self.update_acc, feed_dict=input_dict)
+        ac = sess.run(self.acc)
+        print [(i.name, i.eval(sess)) for i in tf.local_variables()]
+        return ac, ct
 
     def pairwise_accuracy(self, sess, fiter, inp_fn):
         """evaluate the correct pairwise order ratio.
@@ -34,8 +36,8 @@ class LTRDNN(object):
         for inst in fiter:
             qrys, poss, negs = inp_fn(inst)
             for qry, pos, neg in itertools.product(qrys, poss, negs):
-                accuracy = self.accumulate_accuracy(sess, qry, pos, neg)
-        return accuracy
+                accuracy, ct = self.accumulate_accuracy(sess, qry, pos, neg)
+        return accuracy, ct
 
 l1 = [[1.0], [1.0], [1.0], [1.0]]
 p1 = [[1.0], [1.0], [1.0], [0.0]]

@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 
 import dataproc
+import itertools
 import numpy as np
-import sys
 import random
+import sys
 import tensorflow as tf
+from collections import defaultdict
 from ltrdnn import LTRDNN
 
 
@@ -23,18 +25,9 @@ flags.DEFINE_float('eps', 1.0, 'zero-loss threshold epsilon in hinge loss')
 flags.DEFINE_integer('eval_steps', 20, 'every how many steps to evaluate')
 
 
-def ramdon_choose(l):
-    rand_obj = random.sample(l, 1)[0]
-    return rand_obj
-
-
 def inp_fn(data):
-    q_indices = []
-    pt_indices = []
-    nt_indices = []
-    q_values = []
-    pt_values = []
-    nt_values = []
+    def _random_choose(l): return random.sample(l, 1)[0] 
+    sp_feed = defaultdict(list)
     batch_size = len(data)
     seq_len = 0
     for i, inst in enumerate(data):
@@ -45,65 +38,54 @@ def inp_fn(data):
         neg_title_num = int(flds[2+pos_title_num])
         neg_titles = flds[2+pos_title_num+1:]
 
-        pos_title = ramdon_choose(pos_titles)
+        pos_title = _random_choose(pos_titles)
         pos_title = map(int, pos_title.split(' '))
-        neg_title = ramdon_choose(neg_titles)
+        neg_title = _random_choose(neg_titles)
         neg_title = map(int, neg_title.split(' '))
 
         seq_len = max(seq_len, len(query), len(pos_title), len(neg_title))
         for j, word_id in enumerate(query):
-            q_indices.append([i, j])
-            q_values.append(word_id)
+            sp_feed['qry_idx'].append([i, j])
+            sp_feed['qry_val'].append(word_id)
         for j, word_id in enumerate(pos_title):
-            pt_indices.append([i, j])
-            pt_values.append(word_id)
+            sp_feed['pos_idx'].append([i, j])
+            sp_feed['pos_val'].append(word_id)
         for j, word_id in enumerate(neg_title):
-            nt_indices.append([i, j])
-            nt_values.append(word_id)
-    return (q_indices, q_values, [batch_size, seq_len]), \
-           (pt_indices, pt_values, [batch_size, seq_len]), \
-           (nt_indices, nt_values, [batch_size, seq_len])
+            sp_feed['neg_idx'].append([i, j])
+            sp_feed['neg_val'].append(word_id)
+    return (sp_feed['qry_idx'], sp_feed['qry_val'], [batch_size, seq_len]), \
+           (sp_feed['pos_idx'], sp_feed['pos_val'], [batch_size, seq_len]), \
+           (sp_feed['neg_idx'], sp_feed['neg_val'], [batch_size, seq_len])
 
 
 def eval_fn(inst):
-    get_len = lambda lst: max([len(x) for x in lst])
+    def _max_len(lst): return max([len(x) for x in lst])
     flds = inst.split('\t')
-    queries = flds[0:1]
-    pos_title_num = int(flds[1])
-    pos_titles = flds[2:2+pos_title_num]
-    neg_title_num = int(flds[2+pos_title_num])
-    neg_titles = flds[2+pos_title_num+1:]
+    qrys = flds[0:1]
+    pos_num = int(flds[1])
+    poss = flds[2:2+pos_num]
+    neg_num = int(flds[2+pos_num])
+    negs = flds[2+pos_num+1:]
+    qrys = [map(int, x.split(' ')) for x in qrys]
+    poss = [map(int, x.split(' ')) for x in poss]
+    negs = [map(int, x.split(' ')) for x in negs]
+    seq_len = max(_max_len(qrys), _max_len(poss), _max_len(negs))
+    batch_size = len(qrys) * len(poss) * len(negs)
 
-    queries = [map(int, x.split(' ')) for x in queries]
-    pos_titles = [map(int, x.split(' ')) for x in pos_titles]
-    neg_titles = [map(int, x.split(' ')) for x in neg_titles]
-    seq_len = max(get_len(queries), get_len(pos_titles), get_len(neg_titles))
-
-    qry_out = []
-    for query in queries:
-        qry_idx = []
-        qry_val = []
-        for j, word_id in enumerate(query):
-            qry_idx.append([0, j])
-            qry_val.append(word_id)
-        qry_out.append((qry_idx, qry_val, [1, seq_len]))
-    pos_out = []
-    for pos_title in pos_titles:
-        pos_idx = []
-        pos_val = []
-        for j, word_id in enumerate(pos_title):
-            pos_idx.append([0, j])
-            pos_val.append(word_id)
-        pos_out.append((pos_idx, pos_val, [1, seq_len]))
-    neg_out = []
-    for neg_title in neg_titles:
-        neg_idx = []
-        neg_val = []
-        for j, word_id in enumerate(neg_title):
-            neg_idx.append([0, j])
-            neg_val.append(word_id)
-        neg_out.append((neg_idx, neg_val, [1, seq_len]))
-    return qry_out, pos_out, neg_out
+    sp_feed = defaultdict(list)
+    for i, (qry, pos, neg) in enumerate(itertools.product(qrys, poss, negs)):
+        for j, word_id in enumerate(qry):
+            sp_feed['qry_idx'].append([i, j])
+            sp_feed['qry_val'].append(word_id)
+        for j, word_id in enumerate(pos):
+            sp_feed['pos_idx'].append([i, j])
+            sp_feed['pos_val'].append(word_id)
+        for j, word_id in enumerate(neg):
+            sp_feed['neg_idx'].append([i, j])
+            sp_feed['neg_val'].append(word_id)
+    return (sp_feed['qry_idx'], sp_feed['qry_val'], [batch_size, seq_len]), \
+           (sp_feed['pos_idx'], sp_feed['pos_val'], [batch_size, seq_len]), \
+           (sp_feed['neg_idx'], sp_feed['neg_val'], [batch_size, seq_len])
 
 
 # train_file = './3.train.negtive_sampled.ids'
