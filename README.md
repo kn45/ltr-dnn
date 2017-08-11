@@ -11,6 +11,6 @@ Tensorflow v1.2 on CPU is used for testing.
 
 ## Reference:
 
-- It's an LTR improvement of [DSSM](https://www.microsoft.com/en-us/research/project/dssm/)
+- It's an LTR improvement of [DSSM](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/cikm2013_DSSM_fullversion.pdf)
 
 
