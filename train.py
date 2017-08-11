@@ -26,7 +26,7 @@ flags.DEFINE_integer('eval_steps', 20, 'every how many steps to evaluate')
 
 
 def inp_fn(data):
-    def _random_choose(l): return random.sample(l, 1)[0] 
+    def _random_choose(l): return random.sample(l, 1)[0]
     sp_feed = defaultdict(list)
     batch_size = len(data)
     seq_len = 0
