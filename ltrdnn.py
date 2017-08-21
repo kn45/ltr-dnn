@@ -37,7 +37,7 @@ class LTRDNN(object):
             embedding = tf.Variable(
                 tf.convert_to_tensor(init_emb, dtype=tf.float32),
                 name='emb_mat')
-            print 'load embedding hot starting...'
+            sys.stderr.write('Use pretrained embedding matrix ...\n')
         # #shape of emb_qry: batch_size * emb_dim
         emb_qry = tf.nn.embedding_lookup_sparse(
             embedding, self.inp_qry, sp_weights=None, combiner=combiner)
@@ -135,15 +135,16 @@ class LTRDNN(object):
                 eval_res.append(sess.run(self.loss, feed_dict=eval_dict))
         return eval_res
 
-    def calc_sim(self, sess, dev_qry, dev_pos, dev_neg):
+    def predict_sim(self, sess, query, title1, title2):
+        """predict similarity between query&title1, query&title2, label
+        @return: [sim_qt1, sim_qt2, 1.0/0.0]
+        """
         eval_dict = {
-            self.inp_qry: dev_qry,
-            self.inp_pos: dev_pos,
-            self.inp_neg: dev_neg}
-        eval_res = []
-        eval_res.append(sess.run([self.sim_qp, self.sim_qn, self.preds], \
-            feed_dict=eval_dict))
-        return eval_res
+            self.inp_qry: query,
+            self.inp_pos: title1,
+            self.inp_neg: title2}
+        return sess.run([self.sim_qp, self.sim_qn, self.preds],
+                        feed_dict=eval_dict)
 
     def predict_diff(self, sess, inp_qry, inp_pos, inp_neg):
         """predict which title is more similar to query.

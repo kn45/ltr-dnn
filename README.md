@@ -6,7 +6,7 @@ Tensorflow v1.2 on CPU is used for testing.
 
 ## Example:
 
-`bash example.sh`
+`bash train.sh`
 
 
 ## Reference:

@@ -9,7 +9,6 @@ import sys
 import tensorflow as tf
 from collections import defaultdict
 from ltrdnn import LTRDNN
-import utils
 
 
 flags = tf.flags
@@ -20,6 +19,9 @@ flags.DEFINE_integer('emb_dim', 256, 'embedding dimension')
 flags.DEFINE_integer('repr_dim', 256, 'sentence representing dimension')
 flags.DEFINE_string('combiner', 'sum', 'how to combine words in a sentence')
 # training related:
+flags.DEFINE_string('train_file', '', 'training data file')
+flags.DEFINE_string('valid_file', '', 'validation data file')
+flags.DEFINE_string('test_file', '', 'testing data file')
 flags.DEFINE_integer('train_bs', 128, 'train batch size')
 flags.DEFINE_integer('max_epoch', 1, 'max epoch')
 flags.DEFINE_integer('max_iter', 1000, 'max iteration')
@@ -90,22 +92,15 @@ def eval_fn(inst):
            (sp_feed['neg_idx'], sp_feed['neg_val'], [batch_size, seq_len])
 
 
-print 'environment done...'
-sys.stdout.flush()
-train_file = '../data/3.train.negtive_sampled.ids'
-test_file = '../data/3.test.negtive_sampled.ids'
-valid_file = '../data/3.test.negtive_sampled.ids'
-init_model = '../split_model/'
-#train_file = '/mnt/yardcephfs/mmyard/g_wxg_fd_search/maricoliao/tensorflow/ltr-dnn/data/3.train.negtive_sampled.ids'
-#test_file = '/mnt/yardcephfs/mmyard/g_wxg_fd_search/maricoliao/tensorflow/ltr-dnn/data/3.test.negtive_sampled.ids'
-#valid_file = '/mnt/yardcephfs/mmyard/g_wxg_fd_search/maricoliao/tensorflow/ltr-dnn/data/3.test.negtive_sampled.ids'
-train_freader = dataproc.BatchReader(train_file, max_epoch=FLAGS.max_epoch)
-with open(valid_file) as f:
+train_freader = dataproc.BatchReader(FLAGS.train_file, FLAGS.max_epoch)
+with open(FLAGS.valid_file) as f:
     valid_data = [x.rstrip('\n') for x in f.readlines()]
 valid_q, valid_pt, valid_nt = inp_fn(valid_data)
 
-init_model = utils.load_model(init_model)
-print 'load init model done...'
+pretrained_emb = None
+# init_model = '../split_model/'
+# pretrained_emb = utils.load_model(init_model)
+# print 'load init model done...'
 
 mdl = LTRDNN(
     vocab_size=FLAGS.vocab_size,
@@ -113,11 +108,7 @@ mdl = LTRDNN(
     repr_dim=FLAGS.repr_dim,
     combiner=FLAGS.combiner,
     eps=FLAGS.eps,
-    init_emb=init_model.emb)
-print 'init mdl model done...'
-print init_model.emb.shape
-init_model.emb = None
-print type(init_model.emb)
+    init_emb=pretrained_emb)
 
 sess = tf.Session()
 sess.run(tf.global_variables_initializer())
@@ -125,27 +116,25 @@ sess.run(tf.local_variables_initializer())
 metrics = ['loss']
 mdl_ckpt_dir = './model_ckpt/model.ckpt'
 print 'train begin...'
-sys.stdout.flush()
 for niter in xrange(FLAGS.max_iter):
     batch_data = train_freader.get_batch(FLAGS.train_bs)
     if not batch_data:
         break
     train_q, train_pt, train_nt = inp_fn(batch_data)
     mdl.train_step(sess, train_q, train_pt, train_nt)
+    if niter % FLAGS.eval_steps != 0:
+        continue
     train_eval = mdl.eval_step(sess, train_q, train_pt, train_nt, metrics)
-    valid_eval = mdl.eval_step(sess, valid_q, valid_pt, valid_nt, metrics) \
-        if niter % FLAGS.eval_steps == 0 else 'SKIP'
-    if niter % FLAGS.eval_steps == 0:
-        now_time = time.strftime('%Y%m%d_%H:%M:%S',time.localtime(time.time()))
-        print  now_time, niter, 'train_loss:', train_eval, 'valid_loss:', valid_eval
-        sys.stdout.flush()
+    valid_eval = mdl.eval_step(sess, valid_q, valid_pt, valid_nt, metrics)
+    ntime = time.strftime('%Y%m%d_%H:%M:%S', time.localtime(time.time()))
+    print ntime, niter, \
+        'train_loss:', train_eval, 'valid_loss:', valid_eval
 
 save_path = mdl.saver.save(sess, mdl_ckpt_dir, global_step=mdl.global_step)
 print 'model saved:', save_path
 
-feval = open(test_file)
-acc = mdl.pairwise_accuracy(sess, feval, eval_fn)
+with open(FLAGS.test_file) as feval:
+    acc = mdl.pairwise_accuracy(sess, feval, eval_fn)
 print 'pairwise accuracy:', acc
 
 sess.close()
-feval.close()

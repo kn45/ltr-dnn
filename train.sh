@@ -1,10 +1,12 @@
 #!/bin/bash
 
-python train.py \
+python -u train.py \
 --train_bs=128 \
 --max_epoch=25 \
 --eps=0.2 \
---eval_steps=1000 \
---max_iter=1200000
+--eval_steps=20 \
+--max_iter=1000 \
+--train_file=./data_train_example.tsv \
+--test_file=./data_test_example.tsv \
+--valid_file=./data_test_example.tsv
 
-#--max_iter=2400000
