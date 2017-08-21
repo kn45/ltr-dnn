@@ -24,6 +24,8 @@ flags.DEFINE_integer('max_epoch', 1, 'max epoch')
 flags.DEFINE_integer('max_iter', 1000, 'max iteration')
 flags.DEFINE_float('eps', 1.0, 'zero-loss threshold epsilon in hinge loss')
 flags.DEFINE_integer('eval_steps', 20, 'every how many steps to evaluate')
+flags.DEFINE_string('predict_file', '', 'file for prediction')
+flags.DEFINE_string('model_dir', './model_ckpt/', 'model dir')
 
 
 def eval_fn(inst):
@@ -39,10 +41,8 @@ def eval_fn(inst):
     negs = [map(int, x.split(' ')) for x in negs]
     seq_len = max(_max_len(qrys), _max_len(poss), _max_len(negs))
     batch_size = len(poss) + len(negs)
-    
     # all titles
     titles = poss + negs
-
     sp_feed = defaultdict(list)
     for i, (qry, titles) in enumerate(itertools.product(qrys, titles)):
         for j, word_id in enumerate(qry):
@@ -55,8 +55,6 @@ def eval_fn(inst):
            (sp_feed['pos_idx'], sp_feed['pos_val'], [batch_size, seq_len]), \
 
 
-#test_file = '../data/3.test.negtive_sampled.ids'
-
 mdl = LTRDNN(
     vocab_size=FLAGS.vocab_size,
     emb_dim=FLAGS.emb_dim,
@@ -67,20 +65,16 @@ mdl = LTRDNN(
 sess = tf.Session()
 sess.run(tf.global_variables_initializer())
 sess.run(tf.local_variables_initializer())
-saver = tf.train.Saver()
-mdl_ckpt_dir = './model_ckpt/'
-ckpt = tf.train.get_checkpoint_state(mdl_ckpt_dir)
-saver = tf.train.import_meta_graph(ckpt.model_checkpoint_path +'.meta')
-saver.restore(sess, ckpt.model_checkpoint_path)
+mdl.saver.restore(sess, tf.train.latest_checkpoint(FLAGS.model_dir))
 
-print 'environment done...'
-for line in sys.stdin:
-    line = line.rstrip("\r\n")
-    #inst = line.split("\t")
-    test_q, test_pt = eval_fn(line)
-    #test_eval = mdl.predict_sim_qq(sess, test_q, test_pt)
-    test_eval = mdl.predict_sim_qt(sess, test_q, test_pt)
-    print test_eval
+predict_freader = dataproc.BatchReader(FLAGS.predict_file, 1)
+
+data = predict_freader.get_batch(1)
+while data:
+    pred_q, pred_pt = eval_fn(data[0].rstrip('\r\n'))
+    pred_eval = mdl.predict_sim_qt(sess, pred_q, pred_pt)
+    print pred_eval
+    data = predict_freader.get_batch(1)
 
 #acc = mdl.pairwise_accuracy(sess, feval, eval_fn)
 #print 'pairwise accuracy:', acc

@@ -27,6 +27,7 @@ flags.DEFINE_integer('max_epoch', 1, 'max epoch')
 flags.DEFINE_integer('max_iter', 1000, 'max iteration')
 flags.DEFINE_float('eps', 1.0, 'zero-loss threshold epsilon in hinge loss')
 flags.DEFINE_integer('eval_steps', 20, 'every how many steps to evaluate')
+flags.DEFINE_string('model_ckpt_file', './model_ckpt/model.ckpt', 'model file')
 
 
 def inp_fn(data):
@@ -130,7 +131,8 @@ for niter in xrange(FLAGS.max_iter):
     print ntime, niter, \
         'train_loss:', train_eval, 'valid_loss:', valid_eval
 
-save_path = mdl.saver.save(sess, mdl_ckpt_dir, global_step=mdl.global_step)
+save_path = mdl.saver.save(
+    sess, FLAGS.model_ckpt_file, global_step=mdl.global_step)
 print 'model saved:', save_path
 
 with open(FLAGS.test_file) as feval:
