@@ -115,7 +115,6 @@ sess = tf.Session()
 sess.run(tf.global_variables_initializer())
 sess.run(tf.local_variables_initializer())
 metrics = ['loss']
-mdl_ckpt_dir = './model_ckpt/model.ckpt'
 print 'train begin...'
 for niter in xrange(FLAGS.max_iter):
     batch_data = train_freader.get_batch(FLAGS.train_bs)

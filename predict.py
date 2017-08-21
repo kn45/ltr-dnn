@@ -76,7 +76,7 @@ while data:
     print pred_eval
     data = predict_freader.get_batch(1)
 
-#acc = mdl.pairwise_accuracy(sess, feval, eval_fn)
-#print 'pairwise accuracy:', acc
+# acc = mdl.pairwise_accuracy(sess, feval, eval_fn)
+# print 'pairwise accuracy:', acc
 
 sess.close()
