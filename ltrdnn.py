@@ -7,7 +7,7 @@ class LTRDNN(object):
     """LTR-DNN model
     """
     def __init__(self, vocab_size, emb_dim=256, repr_dim=256,
-                 combiner='sum', lr=1e-3, eps=1.0,
+                 combiner='sum', lr=1e-4, eps=1.0,
                  init_emb=None):
         """Construct network.
         """
@@ -28,13 +28,16 @@ class LTRDNN(object):
         self.inp_prd = tf.sparse_placeholder(dtype=tf.int64, name='input_prd')
 
         # embedding from pretrained one or random one
-        embedding = \
-            tf.Variable(
-                tf.convert_to_tensor(init_emb, dtype=tf.float32),
-                name='emb_mat') if init_emb else \
-            tf.Variable(
-                tf.random_uniform([vocab_size, emb_dim], -0.2, 0.2),
+        embedding = None
+        if init_emb is None:
+            embedding = tf.Variable(
+                tf.random_uniform([vocab_size, emb_dim], -0.02, 0.02),
                 name='emb_mat')
+        else:
+            embedding = tf.Variable(
+                tf.convert_to_tensor(init_emb, dtype=tf.float32),
+                name='emb_mat')
+            print 'load embedding hot starting...'
         # #shape of emb_qry: batch_size * emb_dim
         emb_qry = tf.nn.embedding_lookup_sparse(
             embedding, self.inp_qry, sp_weights=None, combiner=combiner)
@@ -130,6 +133,16 @@ class LTRDNN(object):
         for metric in metrics:
             if metric == 'loss':
                 eval_res.append(sess.run(self.loss, feed_dict=eval_dict))
+        return eval_res
+
+    def calc_sim(self, sess, dev_qry, dev_pos, dev_neg):
+        eval_dict = {
+            self.inp_qry: dev_qry,
+            self.inp_pos: dev_pos,
+            self.inp_neg: dev_neg}
+        eval_res = []
+        eval_res.append(sess.run([self.sim_qp, self.sim_qn, self.preds], \
+            feed_dict=eval_dict))
         return eval_res
 
     def predict_diff(self, sess, inp_qry, inp_pos, inp_neg):
