@@ -131,7 +131,8 @@ for niter in xrange(FLAGS.max_iter):
         'train_loss:', train_eval, 'valid_loss:', valid_eval
 
 save_path = mdl.saver.save(
-    sess, FLAGS.model_ckpt_file, global_step=mdl.global_step)
+    sess, FLAGS.model_ckpt_file, global_step=mdl.global_step,
+    write_meta_graph=False)
 print 'model saved:', save_path
 
 with open(FLAGS.test_file) as feval:
