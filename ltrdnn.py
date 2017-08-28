@@ -7,8 +7,7 @@ class LTRDNN(object):
     """LTR-DNN model
     """
     def __init__(self, vocab_size, emb_dim=256, repr_dim=256,
-                 combiner='sum', lr=1e-4, eps=1.0,
-                 init_emb=None):
+                 combiner='sum', lr=1e-4, eps=1.0):
         """Construct network.
         """
         if combiner not in ['sum', 'mean']:
@@ -16,6 +15,7 @@ class LTRDNN(object):
 
         self.dropout_prob = tf.placeholder(tf.float32, name='dropout_prob')
         self.global_step = tf.Variable(0, name='global_step', trainable=False)
+        self.pretrained_emb = tf.placeholder(tf.float32, [vocab_size, emb_dim])
         self.eps = eps
 
         # prepare placeholder for query, pos, neg
@@ -28,25 +28,21 @@ class LTRDNN(object):
         self.inp_prd = tf.sparse_placeholder(dtype=tf.int64, name='input_prd')
 
         # embedding from pretrained one or random one
-        embedding = None
-        if init_emb is None:
-            embedding = tf.Variable(
-                tf.random_uniform([vocab_size, emb_dim], -0.02, 0.02),
-                name='emb_mat')
-        else:
-            embedding = tf.Variable(
-                tf.convert_to_tensor(init_emb, dtype=tf.float32),
-                name='emb_mat')
-            sys.stderr.write('Use pretrained embedding matrix ...\n')
+        self.embedding = tf.Variable(
+            tf.random_uniform([vocab_size, emb_dim], -0.02, 0.02),
+            name='emb_mat')
+        # defined an assign embedding value op
+        self.init_embedding = self.embedding.assign(self.pretrained_emb)
+
         # #shape of emb_qry: batch_size * emb_dim
         emb_qry = tf.nn.embedding_lookup_sparse(
-            embedding, self.inp_qry, sp_weights=None, combiner=combiner)
+            self.embedding, self.inp_qry, sp_weights=None, combiner=combiner)
         emb_pos = tf.nn.embedding_lookup_sparse(
-            embedding, self.inp_pos, sp_weights=None, combiner=combiner)
+            self.embedding, self.inp_pos, sp_weights=None, combiner=combiner)
         emb_neg = tf.nn.embedding_lookup_sparse(
-            embedding, self.inp_neg, sp_weights=None, combiner=combiner)
+            self.embedding, self.inp_neg, sp_weights=None, combiner=combiner)
         emb_prd = tf.nn.embedding_lookup_sparse(
-            embedding, self.inp_prd, sp_weights=None, combiner=combiner)
+            self.embedding, self.inp_prd, sp_weights=None, combiner=combiner)
 
         # construct fc layer to get repr of sentence
         with tf.name_scope('query-fc'):
@@ -121,6 +117,12 @@ class LTRDNN(object):
             self.inp_pos: inp_batch_p,
             self.inp_neg: inp_batch_n}
         sess.run(self.opt, feed_dict=input_dict)
+
+    def assign_embedding(self, sess, embedding=None):
+        if embedding is None:
+            raise Exception('embedding is None')
+        input_dict = {self.pretrained_emb: embedding}
+        sess.run(self.init_embedding, feed_dict=input_dict)
 
     def eval_step(self, sess, dev_qry, dev_pos, dev_neg, metrics=None):
         if not metrics:

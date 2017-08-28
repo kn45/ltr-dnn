@@ -28,9 +28,29 @@ flags.DEFINE_integer('max_iter', 1000, 'max iteration')
 flags.DEFINE_float('eps', 1.0, 'zero-loss threshold epsilon in hinge loss')
 flags.DEFINE_integer('eval_steps', 20, 'every how many steps to evaluate')
 flags.DEFINE_string('model_ckpt_file', './model_ckpt/model.ckpt', 'model file')
+flags.DEFINE_string('embedding_file', './words_embedding', 'embedding file')
+
+
+def load_embedding(embf, vocab_size, emb_size):
+    """load pretrained embedding mat from file.
+    """
+    # create a random word_embedding list.
+    # emb = [np.random.uniform(-0.2, 0.2, emb_size) for i in range(vocab_size)]
+    emb = np.zeros((vocab_size, emb_size))
+    with open(embf) as f:
+        for nl, line in enumerate(f):
+            flds = line.rstrip(' \n').split(' ')
+            word_idx = int(flds[0])
+            vec = map(float, flds[1:])
+            emb[word_idx] = np.array(vec)
+    return np.array(emb)
 
 
 def inp_fn(data):
+    """Extract training data.
+    @data   : line in training file.
+    @return : training data in required format
+    """
     def _random_choose(l): return random.sample(l, 1)[0]
     sp_feed = defaultdict(list)
     batch_size = len(data)
@@ -64,6 +84,10 @@ def inp_fn(data):
 
 
 def eval_fn(inst):
+    """Extract evaluating data.
+    @inst   : line in evaluating file.
+    @return : evaluating data in required format
+    """
     def _max_len(lst): return max([len(x) for x in lst])
     flds = inst.split('\t')
     qrys = flds[0:1]
@@ -98,22 +122,22 @@ with open(FLAGS.valid_file) as f:
     valid_data = [x.rstrip('\n') for x in f.readlines()]
 valid_q, valid_pt, valid_nt = inp_fn(valid_data)
 
-pretrained_emb = None
-# init_model = '../split_model/'
-# pretrained_emb = utils.load_model(init_model)
-# print 'load init model done...'
 
 mdl = LTRDNN(
     vocab_size=FLAGS.vocab_size,
     emb_dim=FLAGS.emb_dim,
     repr_dim=FLAGS.repr_dim,
     combiner=FLAGS.combiner,
-    eps=FLAGS.eps,
-    init_emb=pretrained_emb)
+    eps=FLAGS.eps)
 
 sess = tf.Session()
 sess.run(tf.global_variables_initializer())
 sess.run(tf.local_variables_initializer())
+print 'loading pretrained embedding from file'
+pretrained_emb = load_embedding(
+    FLAGS.embedding_file, FLAGS.vocab_size, FLAGS.emb_dim)
+mdl.assign_embedding(sess, pretrained_emb)
+
 metrics = ['loss']
 print 'train begin...'
 for niter in xrange(FLAGS.max_iter):
