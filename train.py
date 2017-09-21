@@ -29,6 +29,8 @@ flags.DEFINE_float('eps', 1.0, 'zero-loss threshold epsilon in hinge loss')
 flags.DEFINE_integer('eval_steps', 20, 'every how many steps to evaluate')
 flags.DEFINE_string('model_ckpt_file', './model_ckpt/model.ckpt', 'model file')
 flags.DEFINE_string('embedding_file', './words_embedding', 'embedding file')
+# log related:
+flags.DEFINE_string('log_path', './log', 'log path')
 
 
 def load_embedding(embf, vocab_size, emb_size):
@@ -131,6 +133,7 @@ mdl = LTRDNN(
     eps=FLAGS.eps)
 
 sess = tf.Session()
+file_writer = tf.summary.FileWriter(FLAGS.log_path, sess.graph)
 sess.run(tf.global_variables_initializer())
 sess.run(tf.local_variables_initializer())
 print 'loading pretrained embedding from file'

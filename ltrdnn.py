@@ -45,50 +45,58 @@ class LTRDNN(object):
             self.embedding, self.inp_prd, sp_weights=None, combiner=combiner)
 
         # construct fc layer to get repr of sentence
-        with tf.name_scope('query-fc'):
-            w = tf.get_variable(
-                'q-fc-W', shape=[emb_dim, repr_dim],
-                initializer=tf.contrib.layers.xavier_initializer())
-            b = tf.Variable(tf.constant(0.1, shape=[repr_dim]), name='b')
+        w = tf.get_variable(
+            'q-fc-W', shape=[emb_dim, repr_dim],
+            initializer=tf.contrib.layers.xavier_initializer())
+        b = tf.Variable(tf.constant(0.1, shape=[repr_dim]), name='b')
+        with tf.name_scope('t_qry-vec'):
             # #shape of repr_qry: batch_size * repr_dim
             self.repr_qry = tf.nn.softsign(
                 tf.nn.xw_plus_b(emb_qry, w, b), name='repr_query')
+            self.norm_qry = tf.nn.l2_normalize(self.repr_qry, dim=1)
+        with tf.name_scope('t_prd-vec'):
             self.repr_prd = tf.nn.softsign(
                 tf.nn.xw_plus_b(emb_prd, w, b), name='repr_predq')
-        with tf.name_scope('title-fc'):
-            w = tf.get_variable(
-                't-fc-W', shape=[emb_dim, repr_dim],
-                initializer=tf.contrib.layers.xavier_initializer())
-            b = tf.Variable(tf.constant(0.1, shape=[repr_dim]), name='b')
+            self.norm_prd = tf.nn.l2_normalize(self.repr_prd, dim=1)
+
+        w = tf.get_variable(
+            't-fc-W', shape=[emb_dim, repr_dim],
+            initializer=tf.contrib.layers.xavier_initializer())
+        b = tf.Variable(tf.constant(0.1, shape=[repr_dim]), name='b')
+        with tf.name_scope('q_pos-vec'):
             self.repr_pos = tf.nn.softsign(
                 tf.nn.xw_plus_b(emb_pos, w, b), name='repr_title_pos')
+            self.norm_pos = tf.nn.l2_normalize(self.repr_pos, dim=1)
+        with tf.name_scope('q_neg-vec'):
             self.repr_neg = tf.nn.softsign(
                 tf.nn.xw_plus_b(emb_neg, w, b), name='repr_title_neg')
+            self.norm_neg = tf.nn.l2_normalize(self.repr_neg, dim=1)
 
         # cosine similarity between q&p, q&n, q&q
-        # #shape of norm_qry: batch_size * repr_dim
-        self.norm_qry = tf.nn.l2_normalize(self.repr_qry, dim=1)
-        self.norm_pos = tf.nn.l2_normalize(self.repr_pos, dim=1)
-        self.norm_neg = tf.nn.l2_normalize(self.repr_neg, dim=1)
-        self.norm_prd = tf.nn.l2_normalize(self.repr_prd, dim=1)
-        # #shape of sim_qp: batch_size * 1
-        self.sim_qp = tf.reduce_sum(
-            tf.multiply(self.norm_qry, self.norm_pos), axis=1)
-        self.sim_qn = tf.reduce_sum(
-            tf.multiply(self.norm_qry, self.norm_neg), axis=1)
-        self.sim_qq = tf.reduce_sum(
-            tf.multiply(self.norm_qry, self.norm_prd), axis=1)
+        with tf.name_scope('sim-qp'):
+            # #shape of sim_qp: batch_size * 1
+            self.sim_qp = tf.reduce_sum(
+                tf.multiply(self.norm_qry, self.norm_pos), axis=1)
+        with tf.name_scope('sim-qn'):
+            self.sim_qn = tf.reduce_sum(
+                tf.multiply(self.norm_qry, self.norm_neg), axis=1)
+        with tf.name_scope('sim-qq'):
+            self.sim_qq = tf.reduce_sum(
+                tf.multiply(self.norm_qry, self.norm_prd), axis=1)
+        with tf.name_scope('diff_qp-qn'):
+            self.sim_diff = tf.subtract(self.sim_qp, self.sim_qn)
 
-        # calculate hinge loss
-        self.sim_diff = tf.subtract(self.sim_qp, self.sim_qn)
-        self.labels = tf.ones(shape=tf.shape(self.sim_diff))
-        # modified hinge_loss = (1 / batch_size) * max(0, eps - sim_diff)
-        self.loss = tf.losses.hinge_loss(
-            labels=self.labels,
-            logits=self.sim_diff / self.eps,
-            reduction=tf.losses.Reduction.MEAN
-            ) * self.eps
-        self.total_loss = self.loss  # add reg-loss
+        with tf.name_scope('label'):
+            self.labels = tf.ones(shape=tf.shape(self.sim_diff))
+        with tf.name_scope('pairwise-loss'):
+            # calculate hinge loss
+            # modified hinge_loss = (1 / batch_size) * max(0, eps - sim_diff)
+            self.loss = tf.losses.hinge_loss(
+                labels=self.labels,
+                logits=self.sim_diff / self.eps,
+                reduction=tf.losses.Reduction.MEAN
+                ) * self.eps
+            self.total_loss = self.loss  # add reg-loss
 
         # optimizer
         # kindly notice the efficiecy problem of Adam with sparse op:
@@ -96,16 +104,18 @@ class LTRDNN(object):
         self.opt = tf.contrib.opt.LazyAdamOptimizer(lr).minimize(
             self.total_loss, global_step=self.global_step)
 
-        # prediction
-        # pred = 1 if sim_pos >= sim_neg else 0
-        self.preds = tf.sign(tf.sign(self.sim_diff) + 1.)
+        with tf.name_scope('pairwise-prediction'):
+            # prediction
+            # pred = 1 if sim_pos >= sim_neg else 0
+            self.preds = tf.sign(tf.sign(self.sim_diff) + 1.)
 
         # @TODO: Add regularization like dropout, l2-reg, etc.
 
-        # accumulated accuracy
-        # re-initialize local variables to conduct a new evaluation
-        self.acc, self.update_acc = tf.contrib.metrics.streaming_accuracy(
-            labels=self.labels, predictions=self.preds)
+        with tf.name_scope('accuracy'):
+            # accumulated accuracy
+            # re-initialize local variables to conduct a new evaluation
+            self.acc, self.update_acc = tf.contrib.metrics.streaming_accuracy(
+                labels=self.labels, predictions=self.preds)
 
         # saver and loader
         # drop local variables of optimizer
@@ -115,7 +125,8 @@ class LTRDNN(object):
         input_dict = {
             self.inp_qry: inp_batch_q,
             self.inp_pos: inp_batch_p,
-            self.inp_neg: inp_batch_n}
+            self.inp_neg: inp_batch_n,
+            self.dropout_prob: 0.5}
         sess.run(self.opt, feed_dict=input_dict)
 
     def assign_embedding(self, sess, embedding=None):
@@ -130,7 +141,8 @@ class LTRDNN(object):
         eval_dict = {
             self.inp_qry: dev_qry,
             self.inp_pos: dev_pos,
-            self.inp_neg: dev_neg}
+            self.inp_neg: dev_neg,
+            self.dropout_prob: 1.0}
         eval_res = []
         for metric in metrics:
             if metric == 'loss':
@@ -144,7 +156,8 @@ class LTRDNN(object):
         eval_dict = {
             self.inp_qry: query,
             self.inp_pos: title1,
-            self.inp_neg: title2}
+            self.inp_neg: title2,
+            self.dropout_prob: 1.0}
         return sess.run([self.sim_qp, self.sim_qn, self.preds],
                         feed_dict=eval_dict)
 
@@ -155,7 +168,8 @@ class LTRDNN(object):
         pred_dict = {
             self.inp_qry: inp_qry,
             self.inp_pos: inp_pos,
-            self.inp_neg: inp_neg}
+            self.inp_neg: inp_neg,
+            self.dropout_prob: 1.0}
         return sess.run(self.preds, feed_dict=pred_dict)
 
     def predict_sim_qt(self, sess, inp_query, inp_title):
@@ -164,7 +178,8 @@ class LTRDNN(object):
         """
         pred_dict = {
             self.inp_qry: inp_query,
-            self.inp_pos: inp_title}
+            self.inp_pos: inp_title,
+            self.dropout_prob: 1.0}
         return sess.run(self.sim_qp, feed_dict=pred_dict)
 
     def predict_sim_qq(self, sess, inp_query1, inp_query2):
@@ -173,17 +188,19 @@ class LTRDNN(object):
         """
         pred_dict = {
             self.inp_qry: inp_query1,
-            self.inp_prd: inp_query2}
+            self.inp_prd: inp_query2,
+            self.dropout_prob: 1.0}
         return sess.run(self.sim_qq, feed_dict=pred_dict)
 
-    def accumulate_accuracy(self, sess, inp_q, inp_p, inp_n):
+    def _accumulate_accuracy(self, sess, inp_q, inp_p, inp_n):
         """update accuracy by inputs and staged value.
         @return: newly-updated accuracy.
         """
         input_dict = {
             self.inp_qry: inp_q,
             self.inp_pos: inp_p,
-            self.inp_neg: inp_n}
+            self.inp_neg: inp_n,
+            self.dropout_prob: 1.0}
         sess.run(self.update_acc, feed_dict=input_dict)
         return sess.run(self.acc)
 
@@ -201,5 +218,5 @@ class LTRDNN(object):
             if verb and nl % verb == 0:  # print hint
                 sys.stderr.write(str(verb) + ' lines in pairwise_acc.\n')
             qrys, poss, negs = inp_fn(inst)
-            accuracy = self.accumulate_accuracy(sess, qrys, poss, negs)
+            accuracy = self._accumulate_accuracy(sess, qrys, poss, negs)
         return accuracy
