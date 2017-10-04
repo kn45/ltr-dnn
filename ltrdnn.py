@@ -49,40 +49,36 @@ class LTRDNN(object):
             'q-fc-W', shape=[emb_dim, repr_dim],
             initializer=tf.contrib.layers.xavier_initializer())
         b = tf.Variable(tf.constant(0.1, shape=[repr_dim]), name='b')
-        with tf.name_scope('t_qry-vec'):
+        with tf.name_scope('tit_qry-vec'):
             # #shape of repr_qry: batch_size * repr_dim
-            self.repr_qry = tf.nn.softsign(
-                tf.nn.xw_plus_b(emb_qry, w, b), name='repr_query')
-            self.norm_qry = tf.nn.l2_normalize(self.repr_qry, dim=1)
-        with tf.name_scope('t_prd-vec'):
-            self.repr_prd = tf.nn.softsign(
-                tf.nn.xw_plus_b(emb_prd, w, b), name='repr_predq')
-            self.norm_prd = tf.nn.l2_normalize(self.repr_prd, dim=1)
+            self.repr_qry = tf.nn.l2_normalize(
+                tf.nn.softsign(tf.nn.xw_plus_b(emb_qry, w, b)), dim=1)
+        with tf.name_scope('tit_prd-vec'):
+            self.repr_prd = tf.nn.l2_normalize(
+                tf.nn.softsign(tf.nn.xw_plus_b(emb_prd, w, b)), dim=1)
 
         w = tf.get_variable(
             't-fc-W', shape=[emb_dim, repr_dim],
             initializer=tf.contrib.layers.xavier_initializer())
         b = tf.Variable(tf.constant(0.1, shape=[repr_dim]), name='b')
-        with tf.name_scope('q_pos-vec'):
-            self.repr_pos = tf.nn.softsign(
-                tf.nn.xw_plus_b(emb_pos, w, b), name='repr_title_pos')
-            self.norm_pos = tf.nn.l2_normalize(self.repr_pos, dim=1)
-        with tf.name_scope('q_neg-vec'):
-            self.repr_neg = tf.nn.softsign(
-                tf.nn.xw_plus_b(emb_neg, w, b), name='repr_title_neg')
-            self.norm_neg = tf.nn.l2_normalize(self.repr_neg, dim=1)
+        with tf.name_scope('qry_pos-vec'):
+            self.repr_pos = tf.nn.l2_normalize(
+                tf.nn.softsign(tf.nn.xw_plus_b(emb_pos, w, b)), dim=1)
+        with tf.name_scope('qry_neg-vec'):
+            self.repr_neg = tf.nn.l2_normalize(
+                tf.nn.softsign(tf.nn.xw_plus_b(emb_neg, w, b)), dim=1)
 
         # cosine similarity between q&p, q&n, q&q
         with tf.name_scope('sim-qp'):
             # #shape of sim_qp: batch_size * 1
             self.sim_qp = tf.reduce_sum(
-                tf.multiply(self.norm_qry, self.norm_pos), axis=1)
+                tf.multiply(self.repr_qry, self.repr_pos), axis=1)
         with tf.name_scope('sim-qn'):
             self.sim_qn = tf.reduce_sum(
-                tf.multiply(self.norm_qry, self.norm_neg), axis=1)
+                tf.multiply(self.repr_qry, self.repr_neg), axis=1)
         with tf.name_scope('sim-qq'):
             self.sim_qq = tf.reduce_sum(
-                tf.multiply(self.norm_qry, self.norm_prd), axis=1)
+                tf.multiply(self.repr_qry, self.repr_prd), axis=1)
         with tf.name_scope('diff_qp-qn'):
             self.sim_diff = tf.subtract(self.sim_qp, self.sim_qn)
 
